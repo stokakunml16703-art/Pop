@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pembuat POP / Wobbler Promo</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1f;--mut:#6b6b70;--bd:#d9d7d2;--ac:#d4141c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--card:#232328;--tx:#f0f0f2;--mut:#9a9aa2;--bd:#3a3a42}}
+:root[data-theme="dark"]{--bg:#17171a;--card:#232328;--tx:#f0f0f2;--mut:#9a9aa2;--bd:#3a3a42}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:1fr}
+@media(min-width:760px){.wrap{grid-template-columns:1fr 1fr;align-items:start}}
+h1{font-size:20px;margin:0 0 4px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{margin-top:16px;width:100%;padding:13px;border:0;border-radius:10px;background:var(--ac);color:#fff;font-size:16px;font-weight:600}
+#msg{font-size:13px;color:var(--mut);margin-top:8px;min-height:18px}
+.prev{display:flex;justify-content:center}
+svg{width:100%;max-width:340px;height:auto;box-shadow:0 2px 14px rgba(0,0,0,.25);background:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="panel">
+  <h1>Pembuat POP / Wobbler</h1>
+  <div style="font-size:13px;color:var(--mut)">Isi data, lihat pratinjau, lalu unduh PDF.</div>
+  <label>Nama produk</label><input id="name" value="Minyak Goreng Sunco">
+  <div class="row">
+   <div><label>Ukuran / varian</label><input id="size" value="2 Liter"></div>
+   <div><label>Ukuran kertas</label><select id="paper"><option value="105">A6</option><option value="148">A5</option><option value="210">A4</option></select></div>
+  </div>
+  <div class="row">
+   <div><label>Periode mulai</label><input id="d1" type="date" value="2026-10-01"></div>
+   <div><label>Periode selesai</label><input id="d2" type="date" value="2026-10-15"></div>
+  </div>
+  <div class="row">
+   <div><label>Harga normal (kecil)</label><input id="normal" inputmode="numeric" placeholder="opsional"></div>
+   <div><label>Harga coret</label><input id="strike" inputmode="numeric" value="38000"></div>
+  </div>
+  <label>Harga promo</label><input id="promo" inputmode="numeric" value="32900">
+  <label>Spesial promo (mis. Beli 2 Gratis 1)</label><input id="special" value="Beli 2 Gratis 1">
+  <button id="dl">Unduh PDF</button>
+  <div id="msg"></div>
+ </div>
+ <div class="prev" id="prev"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const RED='#d4141c',YEL='#ffd400',DK='#7a0a0f',GR='#666666';
+const H=141.4;
+const $=id=>document.getElementById(id);
+const MON=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+let M=null;
+function tw(s,size,b){M.setFont('helvetica',b?'bold':'normal');M.setFontSize(size*72/25.4);return M.getTextWidth(s)}
+function wrap(str,size,b,maxW){const out=[];for(const p of str.split('\n')){let l='';for(const w of p.split(/\s+/).filter(Boolean)){const t=l?l+' '+w:w;if(tw(t,size,b)<=maxW||!l)l=t;else{out.push(l);l=w}}if(l)out.push(l)}return out}
+function fit(str,start,min,b,maxW,maxL){let s=start,l=wrap(str,s,b,maxW);while((l.length>maxL||l.some(x=>tw(x,s,b)>maxW))&&s>min){s-=.5;l=wrap(str,s,b,maxW)}return{s,l}}
+const num=v=>{const n=String(v||'').replace(/\D/g,'');return n?Number(n).toLocaleString('id-ID'):''};
+const fd=v=>{if(!v)return'';const [y,m,d]=v.split('-');return Number(d)+' '+MON[m-1]+' '+y};
+function build(d,off){
+ const o=[];let y=20+off;
+ o.push({k:'rect',x:0,y:0,w:100,h:20,c:RED});
+ o.push({k:'text',x:50,y:14,s:11,b:1,c:'#ffffff',t:'PROMO',a:'m'});
+ const f=fit((d.name||'NAMA PRODUK').toUpperCase(),9.5,5,true,88,3);
+ y+=6;
+ f.l.forEach((ln,i)=>{o.push({k:'text',x:50,y:y+f.s*.85+i*f.s*1.15,s:f.s,b:1,c:'#222222',t:ln,a:'m'})});
+ y+=f.s*.85+(f.l.length-1)*f.s*1.15+f.s*.3;
+ if(d.size){y+=6;o.push({k:'text',x:50,y:y,s:6,b:0,c:GR,t:d.size,a:'m'});}
+ y+=5;
+ if(d.normal){y+=5;o.push({k:'text',x:50,y:y,s:4.5,b:0,c:GR,t:'Harga normal Rp '+d.normal,a:'m'})}
+ if(d.strike){const t='Rp '+d.strike,s=9;y+=2+s*.8;o.push({k:'text',x:50,y:y,s:s,b:0,c:GR,t:t,a:'m'});const w=tw(t,s,false);o.push({k:'line',x1:50-w/2-1,x2:50+w/2+1,y:y-s*.3,c:RED,w:.7})}
+ if(d.promo){let ns=26;const rp=9;while(ns>8&&tw('Rp',rp,true)+2+tw(d.promo,ns,true)>90)ns-=.5;
+  const rw=tw('Rp',rp,true),nw=tw(d.promo,ns,true),x0=(100-rw-2-nw)/2;y+=4+ns*.8;
+  o.push({k:'text',x:x0,y:y-ns*.8+rp*.8,s:rp,b:1,c:RED,t:'Rp',a:'s'});
+  o.push({k:'text',x:x0+rw+2,y:y,s:ns,b:1,c:RED,t:d.promo,a:'s'})}
+ if(d.special){const g=fit(d.special.toUpperCase(),8,4,true,78,2);y+=7;const h=g.l.length*g.s*1.2+6;
+  o.push({k:'rect',x:6,y:y,w:88,h:h,r:4,c:YEL});
+  g.l.forEach((ln,i)=>o.push({k:'text',x:50,y:y+3+g.s*.9+i*g.s*1.2,s:g.s,b:1,c:DK,t:ln,a:'m'}));y+=h}
+ const per=d.d1&&d.d2?'Periode: '+d.d1+' s/d '+d.d2:(d.d1?'Mulai: '+d.d1:(d.d2?'Sampai: '+d.d2:''));
+ if(per)o.push({k:'text',x:50,y:133,s:4.5,b:0,c:'#333333',t:per,a:'m'});
+ o.push({k:'rect',x:0,y:H-3,w:100,h:3,c:RED});
+ return{o,end:y}
+}
+function data(){return{name:$('name').value.trim(),size:$('size').value.trim(),d1:fd($('d1').value),d2:fd($('d2').value),normal:num($('normal').value),strike:num($('strike').value),promo:num($('promo').value),special:$('special').value.trim()}}
+function layout(d){const a=build(d,0);const off=Math.max(0,(110-(a.end-20))/2);return build(d,off).o}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function svg(ops){let s='<svg viewBox="0 0 100 '+H+'" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">';
+ for(const p of ops){
+  if(p.k==='rect')s+='<rect x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="'+(p.r||0)+'" fill="'+p.c+'"/>';
+  else if(p.k==='line')s+='<line x1="'+p.x1+'" x2="'+p.x2+'" y1="'+p.y+'" y2="'+p.y+'" stroke="'+p.c+'" stroke-width="'+p.w+'"/>';
+  else s+='<text x="'+p.x+'" y="'+p.y+'" font-size="'+p.s+'" font-weight="'+(p.b?700:400)+'" fill="'+p.c+'" text-anchor="'+(p.a==='m'?'middle':'start')+'">'+esc(p.t)+'</text>'}
+ return s+'</svg>'}
+const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+function pdf(ops,W){const s=W/100;const doc=new jspdf.jsPDF({unit:'mm',format:[W,W*1.414],orientation:'p'});
+ for(const p of ops){
+  if(p.k==='rect'){doc.setFillColor(...rgb(p.c));p.r?doc.roundedRect(p.x*s,p.y*s,p.w*s,p.h*s,p.r*s,p.r*s,'F'):doc.rect(p.x*s,p.y*s,p.w*s,p.h*s,'F')}
+  else if(p.k==='line'){doc.setDrawColor(...rgb(p.c));doc.setLineWidth(p.w*s);doc.line(p.x1*s,p.y*s,p.x2*s,p.y*s)}
+  else{doc.setFont('helvetica',p.b?'bold':'normal');doc.setFontSize(p.s*s*72/25.4);doc.setTextColor(...rgb(p.c));doc.text(p.t,p.x*s,p.y*s,p.a==='m'?{align:'center'}:{})}}
+ return doc}
+function render(){if(!M)return;$('prev').innerHTML=svg(layout(data()))}
+function init(){if(!window.jspdf){$('msg').textContent='Pustaka PDF gagal dimuat.';return}
+ M=new jspdf.jsPDF({unit:'mm',format:[100,H]});
+ ['name','size','d1','d2','normal','strike','promo','special'].forEach(id=>$(id).addEventListener('input',render));
+ ['normal','strike','promo'].forEach(id=>$(id).addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'')}));
+ render()}
+$('dl').addEventListener('click',async()=>{
+ const msg=$('msg');msg.textContent='';
+ try{
+  const d=layout(data()),W=Number($('paper').value),doc=pdf(d,W);
+  const fn='POP-'+(($('name').value||'produk').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'produk')+'.pdf';
+  const blob=doc.output('blob');
+  const direct=()=>{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(u),60000);msg.innerHTML='Jika unduhan tidak mulai, <a href="'+u+'" target="_blank" rel="noopener" style="color:var(--ac)">buka PDF di tab baru</a>.'};
+  let dls=null;
+  try{dls=window.claude&&await window.claude.use('downloads')}catch(_){}
+  if(!dls){direct();return}
+  try{await dls.save({filename:fn,data:blob});msg.textContent='PDF siap disimpan.'}
+  catch(e){if(e&&e.code==='declined'){msg.textContent='Unduhan dibatalkan.'}else{direct()}}
+ }catch(e){msg.textContent='Gagal membuat PDF: '+((e&&e.message)||e)}
+});
+init();
+</script>
+</body>
+</html>
